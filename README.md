@@ -1,118 +1,90 @@
-# XDUCraft Invite (`nonebot-plugin-xducraft-invite`) 0.1.0
+# XDUCraft Invite
 
-基于 NoneBot 2 与 OneBot v11 的 Minecraft 白名单邀请码自助领取与私聊运维管理插件。
+Minecraft 白名单邀请码自助领取与私聊运维管理插件。绑定单一核心群聊，群成员在群内申请时核查资格并私聊下发邀请码，管理员与超级用户通过私聊进行初始化与发码管理。
 
-仅服务于单个绑定的核心交流群。群成员在绑定群内申请时，核查成员资格后通过**私聊**下发邀请码，防止群内泄露；管理员与超管可通过私聊进行初始化、记录查询与补发。
+如果需要部署包含全部插件的完整机器人，请阅读[整套机器人的安装说明](https://github.com/FlyingPig278/XDUCraft-bot)。
 
-主部署宿主仓库参见：[FlyingPig278/XDUCraft-bot](https://github.com/FlyingPig278/XDUCraft-bot)。
+## 功能与行为
 
----
+插件仅服务于一个绑定的群聊。新入群成员在群内申请时，机器人核验其入群时间与成员资格，并通过私聊下发邀请码。
 
-## 功能特性
-
-- **核心群资格核验**：严格绑定单一交流群。群成员申请时核验成员身份，并通过私聊下发邀请码。
-- **防止重复领取**：按用户限制领取频次与记录历史租约状态。
-- **管理端私聊运维**：超级用户可通过私聊执行初始化、查询发放记录与手动为特定成员补发。
-- **双重门禁与前置初始化要求**：
-  1. 必须先由超级用户私聊执行 `/invite init` 初始化核心群成员快照（未初始化前禁止开启自助开关）；
-  2. 在 WebUI 插件页或通过 Core SDK 开启全局总开关 `invite`；
-  3. 开启群自助领取功能（在绑定群内发送 `/功能 on 邀请码自助领取`，系统会自动同步本群插件总开关）。
-
----
-
-## 启动期部署参数
-
-本插件包含全局独占的启动期参数，修改后**必须重启 NoneBot 进程**方可生效：
-
-- `invite_group_id`：绑定的核心交流群号（字符串，初始化后锁定）；
-- `invite_api_url`：邀请码后端生成接口（必须为 HTTPS 地址）；
-- `invite_api_secret`：后端接口鉴权密钥（密文字段，仅写入）。
-
-兼容 `.env` 中的 `INVITE_GROUP_ID`、`INVITE_API_URL` 与 `INVITE_API_SECRET` 作为启动基线。在 WebUI 或 API 中显式保存的修改会记录至 Core SQLite 的 `deployment_overrides`，移除覆盖（unset）后下一次重启将自动恢复为 `.env` 基准值。
-
----
-
-## 指令列表与交互
-
-### 1. 前置初始化
-
-首次使用前，**超级用户必须私聊机器人执行初始化**：
-```text
-/invite init
-```
-机器人拉取当前绑定群的成员列表并建立持久化资格快照。
-
-### 2. 常用指令
-
-| 指令 | 范围与权限 | 说明 |
-| :--- | :--- | :--- |
-| `@机器人 邀请码` / `/邀请码` | 绑定群内（成员均可） | 申请白名单邀请码（核验资格后私聊下发） |
-| `/invite status` | 私聊（超管） | 查看当前部署状态、绑定群与初始化时间 |
-| `/invite list [页码]` | 私聊（超管） | 分页查看已发放的邀请码记录 |
-| `/invite grant <QQ号>` | 私聊（超管） | 手动为指定成员发放邀请码 |
-
----
+初始化时会自动记录当前群内的已有成员。初始化前入群的历史成员无法自助领取，需由管理员手动发码，防止老成员重复刷取。每位成员仅可成功自助领取一次。
 
 ## 安装与加载
 
-> [!NOTE]  
-> 本软件包尚未发布至公共 PyPI 仓库，请使用 Git 标签安装。
-
-### 1. 宿主环境安装
-
-在已初始化的 NoneBot 2 部署环境中，先安装 Core 核心包，再安装本插件：
+在现有 NoneBot 2.4.x 项目环境中，先安装 Core 核心包，再安装本插件：
 
 ```bash
-# 1. 安装 Core 核心包（需包含 [onebot] 适配器扩展）
 pip install "nonebot-plugin-xducraft-core[onebot] @ git+https://github.com/FlyingPig278/nonebot-plugin-xducraft-core.git@v0.3.0"
-
-# 2. 安装 Invite 插件
 pip install "nonebot-plugin-xducraft-invite @ git+https://github.com/FlyingPig278/nonebot-plugin-xducraft-invite.git@v0.1.0"
 ```
 
-### 2. 宿主加载配置
-
-在 NoneBot 宿主项目的 `pyproject.toml` 中显式同时加载 Core 与本插件：
+在已有项目的 `pyproject.toml` 中的 `plugins` 列表中追加模块，不要覆盖已有配置：
 
 ```toml
 [tool.nonebot]
 plugins = [
+    # ... 已有插件 ...
     "xducraft_config",
     "xducraft_invite",
 ]
 ```
 
----
+## 部署参数与群绑定
 
-## 本地开发与测试（贡献者）
+本插件包含以下启动期参数，修改后必须重启 NoneBot 进程生效：
 
-克隆本仓库到本地后，在仓库根目录执行：
+- `invite_group_id`（环境变量 `INVITE_GROUP_ID`）：绑定的群聊群号。初始化后该参数永久锁定，不可迁移到其他群。
+- `invite_api_url`（环境变量 `INVITE_API_URL`）：邀请码生成后端接口，必须为 HTTPS 地址，默认值为 `https://www.xducraft.cn/api/invitation-codes/generate`。
+- `invite_api_secret`（环境变量 `INVITE_API_SECRET`）：后端接口鉴权密钥。在 WebUI 管理面板中保存后不会回显已填写的密钥内容。
+
+以上参数可先在 `.env` 中声明基准值，也可以在 WebUI 管理面板中修改，重启进程后生效。
+
+## 启用与前置初始化步骤
+
+插件全局开关与自助功能默认关闭。自助领取生效需按顺序完成以下配置：
+
+首先确认已配置 `invite_group_id` 与 `invite_api_secret`，且 `invite_api_url` 为合法 HTTPS 地址，并重启 NoneBot 进程加载这些参数。
+
+接着开启插件全局总开关。全局开关是所有邀请码指令（包括群内申请和私聊管理）生效的前提。请在 WebUI 管理面板的插件页面开启邀请码插件，或者参考[不使用网页时启用插件](https://github.com/FlyingPig278/nonebot-plugin-xducraft-core#不使用网页时启用插件)在代码中单次启用。
+
+然后由超级用户私聊机器人发送 `/invite init` 完成初始化。机器人会拉取绑定群当前所有成员建立历史记录，并自动开启该群的自助领取功能。在未完成初始化前，自助领取功能无法开启。
+
+初始化完成后自助领取已处于开启状态。后续若需临时暂停或重新恢复，管理员可在私聊发送 `/invite off` 或 `/invite on`；若安装了 `nonebot-plugin-xducraft-features` 插件，也可以在群内发送 `/功能 off 邀请码自助领取` 或 `/功能 on 邀请码自助领取`。
+
+## 指令说明
+
+### 群内申请指令
+
+必须在绑定的群聊中发送，群成员均可调用：
+
+- `/邀请码` 或 `@机器人 邀请码`：申请白名单邀请码。申请指令不能附加额外参数。机器人核验资格后，通过私聊向申请人发送邀请码，并在群内回复发送回执。
+
+### 私聊管理指令
+
+管理指令必须在与机器人的私聊中发送，群内发送不予受理：
+
+- `/invite init`：仅限 SUPERUSER。读取当前绑定群成员列表建立快照，确立初始化状态并自动开启自助发码。
+- `/invite status`：群主、管理员或 SUPERUSER 可用。查看当前绑定群、初始化状态、历史成员数、已领取数与发码统计。
+- `/invite on` 或 `/invite off`：群主、管理员或 SUPERUSER 可用。开启或关闭成员自助领取功能。未初始化时无法开启。
+- `/invite <QQ号>`：群主、管理员或 SUPERUSER 可用。为指定群成员生成并发放邀请码，直接在私聊中将邀请码返回给执行操作的管理员。若该成员已领取过则拒绝。
+- `/invite force <QQ号>`：群主、管理员或 SUPERUSER 可用。强制为已领取过邀请码的群成员重复生成并发放邀请码。
+
+## 业务数据存储与自定义路径
+
+群成员快照、发放记录与领取状态保存在独立业务数据文件中（位于数据目录下的 `plugins/invite/`）。
+
+若需要指定外部数据目录，必须在启动前通过操作系统环境变量设置 `XDUCRAFT_DATA_DIR`（绝对路径），不能仅写在 `.env` 中。
+
+## 本地开发与测试
 
 ```bash
-# 安装 Core 依赖与本地开发依赖
 pip install "nonebot-plugin-xducraft-core[onebot] @ git+https://github.com/FlyingPig278/nonebot-plugin-xducraft-core.git@v0.3.0"
 pip install -e ".[dev]"
-
-# 运行自动化测试
 pytest
-
-# 本地构建 wheel 发行包
 python -m build
 ```
 
-本地构建产物将输出至 `dist/` 目录。
+## 许可证
 
----
-
-## 业务数据存储边界
-
-- **业务数据严格隔离**：群成员快照、发放记录与租约状态保存在独立业务数据文件中（位于 `<DATA_DIR>/plugins/invite/`），不混入 Core 配置数据库。
-- **数据目录环境变量**：若需要自定义外部数据目录，必须在启动前通过操作系统环境变量配置 `XDUCRAFT_DATA_DIR`（绝对路径），切勿仅写在 live `.env` 中。
-
----
-
-## 许可证说明
-
-本项目自身源码采用 [MIT License](LICENSE) 授权开源。
-
-第三方 API 依赖与外部系统接口遵循各自独立的授权许可。
+本项目采用 [MIT License](LICENSE) 授权开源。
